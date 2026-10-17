@@ -30,7 +30,7 @@ from telegram.error import RetryAfter
 
 BOT_TOKEN = os.getenv(
     "BOT_TOKEN",
-    "8923466092:AAEjDwCOrRWQJ8NAQz8ZiXo_7QHSQKmxLvQ"
+    "8928564560:AAEby0GBTolr-E9TcjhWeFUez5e_9bWNW-U"
 ).strip()
 
 ADMIN_IDS = {
