@@ -45,7 +45,19 @@ STORAGE_CHAT_ID = int(
     )
 )
 
-DB = "bot.db"
+# Render Persistent Disk: set DISK_MOUNT_PATH=/var/data in Render.
+# Keep the database on the persistent disk so links survive restarts/deploys.
+DISK_MOUNT_PATH = os.getenv("DISK_MOUNT_PATH", "/var/data").strip()
+os.makedirs(DISK_MOUNT_PATH, exist_ok=True)
+DB = os.getenv("DB_PATH", os.path.join(DISK_MOUNT_PATH, "bot.db"))
+
+# One-time migration: if the old local bot.db still exists and the persistent
+# database does not, copy the old database so existing links are preserved.
+LEGACY_DB = os.path.join(os.getcwd(), "bot.db")
+if not os.path.exists(DB) and os.path.abspath(LEGACY_DB) != os.path.abspath(DB) and os.path.isfile(LEGACY_DB):
+    import shutil
+    shutil.copy2(LEGACY_DB, DB)
+    print("Migrated existing bot.db to persistent storage:", DB)
 
 # Telegram fire message effect
 FIRE_EFFECT_ID = "5104841245755180586"
