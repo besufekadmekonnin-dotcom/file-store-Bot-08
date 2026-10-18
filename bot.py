@@ -28,10 +28,8 @@ from telegram.error import RetryAfter
 # CONFIG
 # ============================================================
 
-BOT_TOKEN = os.getenv(
-    "BOT_TOKEN",
-    "8928564560:AAEby0GBTolr-E9TcjhWeFUez5e_9bWNW-U"
-).strip()
+# Set BOT_TOKEN in Render Environment Variables. Never hard-code your token.
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8928564560:AAEby0GBTolr-E9TcjhWeFUez5e_9bWNW-U").strip()
 
 ADMIN_IDS = {
     6004785454,
@@ -45,19 +43,32 @@ STORAGE_CHAT_ID = int(
     )
 )
 
-# Render Persistent Disk: set DISK_MOUNT_PATH=/var/data in Render.
-# Keep the database on the persistent disk so links survive restarts/deploys.
-DISK_MOUNT_PATH = os.getenv("DISK_MOUNT_PATH", "/var/data").strip()
-os.makedirs(DISK_MOUNT_PATH, exist_ok=True)
-DB = os.getenv("DB_PATH", os.path.join(DISK_MOUNT_PATH, "bot.db"))
+# Render Persistent Disk: if you add one, set DISK_MOUNT_PATH to its exact
+# Mount Path in Render (for example /var/data). Without a mounted disk, use a
+# writable project-local directory to avoid PermissionError. That local storage
+# is ephemeral and may be lost on redeploy; it does NOT preserve links permanently.
+_default_data_dir = os.path.join(os.getcwd(), "data")
+DISK_MOUNT_PATH = os.getenv("DISK_MOUNT_PATH", _default_data_dir).strip() or _default_data_dir
+try:
+    os.makedirs(DISK_MOUNT_PATH, exist_ok=True)
+except PermissionError:
+    # A configured mount path may be wrong or not mounted; fall back so startup
+    # can proceed, while clearly warning that this fallback is not persistent.
+    DISK_MOUNT_PATH = _default_data_dir
+    os.makedirs(DISK_MOUNT_PATH, exist_ok=True)
+    print("WARNING: DISK_MOUNT_PATH is not writable. Using temporary local data folder:", DISK_MOUNT_PATH)
+    print("WARNING: Add a Render Persistent Disk and set DISK_MOUNT_PATH to its exact Mount Path to preserve links.")
+DB = os.path.abspath(os.getenv("DB_PATH", os.path.join(DISK_MOUNT_PATH, "bot.db")))
 
-# One-time migration: if the old local bot.db still exists and the persistent
-# database does not, copy the old database so existing links are preserved.
-LEGACY_DB = os.path.join(os.getcwd(), "bot.db")
-if not os.path.exists(DB) and os.path.abspath(LEGACY_DB) != os.path.abspath(DB) and os.path.isfile(LEGACY_DB):
+# Copy an existing project-local database once, only if the persistent database
+# is not present yet. This cannot recover a database that stayed on the old host.
+LEGACY_DB = os.path.abspath(os.path.join(os.getcwd(), "bot.db"))
+if not os.path.exists(DB) and LEGACY_DB != DB and os.path.isfile(LEGACY_DB):
     import shutil
     shutil.copy2(LEGACY_DB, DB)
     print("Migrated existing bot.db to persistent storage:", DB)
+else:
+    print("Using SQLite database:", DB)
 
 # Telegram fire message effect
 FIRE_EFFECT_ID = "5104841245755180586"
